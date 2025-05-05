@@ -2,7 +2,6 @@
 
 import streamlit as st
 import pandas as pd
-import google.generativeai as genai
 import io
 import os
 from google import genai
