@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import os
 from google import genai
 from streamlit_tags import st_tags
 import altair as alt
