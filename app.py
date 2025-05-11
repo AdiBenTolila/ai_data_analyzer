@@ -11,7 +11,7 @@ from typing import List, Literal
 
 client = genai.Client(api_key=os.environ.get("API_KEY"))
 
-client = genai.Client(api_key=gemini_key)
+# client = genai.Client(api_key=gemini_key)
 st.markdown("""
     <style>
     .stMainBlockContainer {
