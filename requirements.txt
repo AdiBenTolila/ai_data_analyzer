@@ -1,4 +1,6 @@
-streamlit 
-google-genai
-streamlit_tags
+pandas
 openpyxl
+google-genai
+streamlit
+streamlit-tags
+openai
