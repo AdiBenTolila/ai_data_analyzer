@@ -87,7 +87,7 @@ if 'last_uploaded_file' in st.session_state:
                     value=st.session_state["suggested_categories"],
                     suggestions=st.session_state["suggested_categories"],
                     maxtags=20,
-                    key="tag-input-1",
+                    key=f"tag-input-{st.session_state['regenerate_count']}",
                 )
             else:
                 classes = []
