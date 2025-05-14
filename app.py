@@ -95,7 +95,6 @@ if 'last_uploaded_file' in st.session_state:
             # Step 3: Classify
             count = 0
             if classes and columns_to_classify and st.button("🚀 Run Classification"):    
-                df = df.head(50)
                 df = df.dropna(subset=columns_to_classify)
                 
                 with st.spinner("Classifying...", show_time=True):
