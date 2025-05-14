@@ -6,9 +6,11 @@ from models import first_classification_ai, classify_data, first_classification_
 
 st.markdown("""
     <style>
-    .stMainBlockContainer {
-        max-width: 70%;
-        margin: 0 auto;
+    @media only screen and (min-width: 600px) {
+        .stMainBlockContainer {
+            max-width: 70%;
+            margin: 0 auto;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
