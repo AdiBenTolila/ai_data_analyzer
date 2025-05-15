@@ -97,17 +97,15 @@ if 'last_uploaded_file' in st.session_state:
             # Step 3: Classify
             count = 0
             if classes and columns_to_classify and st.button("🚀 Run Classification"):    
+
                 df = df.dropna(subset=columns_to_classify)
                 
                 with st.spinner("Classifying...", show_time=True):
-                    data_to_classify = df[columns_to_classify].dropna()
-                    classifications_indexes = ~df[columns_to_classify].isna().any(axis=1)
+                    data_to_classify = df[columns_to_classify]
                     
                     result = classify_data(data_to_classify.values, classes, num_thread=4)
-                    # result = classify_data_gpt(data_to_classify.squeeze().tolist(), classes, num_thread=16)
 
-                    df["AI סיווג"] = pd.Series([None] * len(df), dtype=object)
-                    df.loc[classifications_indexes, 'AI סיווג'] = pd.Series(result, dtype=object)
+                    df['AI סיווג'] = result
                 st.session_state["classified_data"] = df
                 st.success("Classification completed!")
 
