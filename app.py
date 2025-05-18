@@ -22,7 +22,7 @@ df = None
 selected_sheet = None
 
 def clean_string(input_string):
-      return re.sub(r'[^a-zA-Z0-9_\-\.]', '_', input_string)
+    re.sub(r'[^a-zA-Z0-9_\-\.]', '_', input_string)
 # If a file is uploaded
 if uploaded_file:
     cleaned_filename = clean_string(uploaded_file.name)  # Clean the uploaded file name
