@@ -1,2 +1,2 @@
 browser.gatherUsageStats = false
-enableXsrfProtection = false
+[server]enableXsrfProtection = false
