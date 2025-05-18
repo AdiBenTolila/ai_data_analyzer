@@ -5,7 +5,7 @@ import pandas as pd
 from streamlit_tags import st_tags
 import altair as alt
 from models import first_classification_ai, classify_data, first_classification_ai_gpt, classify_data_gpt
-import re
+
 st.markdown("""
     <style>
     @media only screen and (min-width: 600px) {
@@ -23,13 +23,8 @@ uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", 
 df = None
 selected_sheet = None
 
-def clean_string(input_string):
-      return re.sub(r'[^a-zA-Z0-9_\-\.]', '_', input_string)
 # If a file is uploaded
 if uploaded_file:
-    
-    cleaned_filename = clean_string(uploaded_file.name)  # Clean the uploaded file name
-    st.session_state["last_uploaded_file"] = cleaned_filename  # Store cleaned filename
     
     if uploaded_file.name.endswith('.csv'):
         selected_sheet = "CSV file"
@@ -106,7 +101,7 @@ if 'last_uploaded_file' in st.session_state:
             # Step 3: Classify
             count = 0
             if classes and columns_to_classify and st.button("🚀 Run Classification"):    
-                df = df.head(50)
+                # df = df.head(50)
                 df = df.dropna(subset=columns_to_classify)
                 
                 with st.spinner("Classifying...", show_time=True):
