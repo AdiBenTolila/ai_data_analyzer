@@ -1,6 +1,7 @@
 pandas
 openpyxl
 google-genai
+tornado==6.4.2
 streamlit
 streamlit-tags
 openai
