@@ -195,7 +195,7 @@ if 'last_uploaded_file' in st.session_state:
                             'values':     f'=Frequency!$B$2:$B${len(chart_data_full)+1}',
                             'fill':       {'color': '#5DADE2'}
                         })
-                        chart.set_title({'name': 'תפלגות קטגוריות'})
+                        chart.set_title({'name': 'התפלגות קטגוריות'})
                         chart.set_x_axis({'name': 'קטגוריה'})
                         chart.set_y_axis({'name': 'כמות'})
                         chart.set_style(10)
