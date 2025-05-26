@@ -5,6 +5,7 @@ import pandas as pd
 from streamlit_tags import st_tags
 import altair as alt
 from models import first_classification_ai, classify_data, first_classification_ai_gpt, classify_data_gpt
+import io
 
 st.markdown("""
     <style>
@@ -142,17 +143,73 @@ if 'last_uploaded_file' in st.session_state:
                 else:
                     st.dataframe(df)
 
-            if "AI סיווג" in df.columns:
-                st.header("📈 תפלגות הסיווגים לפי קטגוריה")
-
-                # Step 1: Split categories by comma and explode
+            if "AI סיווג" in df.columns and st.session_state.get("classified_data") is not None:
                 exploded_df = df.explode('AI סיווג')['AI סיווג']
-
-                # Step 2: Count category frequencies
                 chart_data = exploded_df.value_counts().reset_index()
                 chart_data.columns = ["קטגוריה", "כמות"]
+                col1, col2 = st.columns([0.9, 0.1])
+                with col1:
+                    st.header("📈 תפלגות הסיווגים לפי קטגוריה")
+                with col2:
+                    all_categories = pd.Series(classes, name="קטגוריה")
+                    chart_data_full = pd.merge(
+                        all_categories.to_frame(), chart_data, on="קטגוריה", how="left"
+                    )
+                    chart_data_full["כמות"] = chart_data_full["כמות"].fillna(0).astype(int)
+          
+                    full_excel_buffer = io.BytesIO()
+                    with pd.ExcelWriter(full_excel_buffer, engine="xlsxwriter") as writer:
 
-                # Step 3: Create chart
+                        df_export = df.copy()
+                        df_export['AI סיווג'] = df_export['AI סיווג'].apply(
+                            lambda l: ', '.join(l) if isinstance(l, list) else l
+                        )
+                        df_export.to_excel(writer, index=False, sheet_name="Classified Data")
+
+                        # גיליון נוסף: טבלת שכיחויות
+                        chart_data_full.to_excel(writer, index=False, sheet_name="Frequency", startrow=1, header=False)
+
+                        workbook = writer.book
+                        worksheet = writer.sheets["Frequency"]
+
+                        # כותרות
+                        header_format = workbook.add_format({'bold': True, 'bg_color': '#D7E4BC'})
+                        worksheet.write('A1', 'קטגוריה', header_format)
+                        worksheet.write('B1', 'כמות', header_format)
+                        worksheet.set_column('A:A', 30)
+                        worksheet.set_column('B:B', 10)
+
+                        # עיצוב צבעוני
+                        worksheet.conditional_format(f'B2:B{len(chart_data_full)+1}', {
+                            'type': '3_color_scale',
+                            'min_color': "#FFC7CE",
+                            'mid_color': "#FFEB9C",
+                            'max_color': "#C6EFCE"
+                        })
+
+                        # גרף עמודות
+                        chart = workbook.add_chart({'type': 'column'})
+                        chart.add_series({
+                            'name':       'שכיחויות',
+                            'categories': f'=Frequency!$A$2:$A${len(chart_data_full)+1}',
+                            'values':     f'=Frequency!$B$2:$B${len(chart_data_full)+1}',
+                            'fill':       {'color': '#5DADE2'}
+                        })
+                        chart.set_title({'name': 'תפלגות קטגוריות'})
+                        chart.set_x_axis({'name': 'קטגוריה'})
+                        chart.set_y_axis({'name': 'כמות'})
+                        chart.set_style(10)
+                        worksheet.insert_chart('D2', chart, {'x_scale': 1.5, 'y_scale': 1.5})
+
+                    # כפתור להורדת קובץ מלא
+                    st.download_button(
+                        label="📥הורד",
+                        # : סיווגים + תפלגות + גרף
+                        data=full_excel_buffer.getvalue(),
+                        file_name="classified_data_and_distribution.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+
                 chart = alt.Chart(chart_data).mark_bar().encode(
                     x=alt.X("קטגוריה:N", sort="-y"),
                     y=alt.Y("כמות:Q"),
@@ -161,6 +218,5 @@ if 'last_uploaded_file' in st.session_state:
                     width=600,
                     height=400
                 )
-
                 st.altair_chart(chart)
 
