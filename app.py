@@ -149,7 +149,7 @@ if 'last_uploaded_file' in st.session_state:
                 chart_data.columns = ["קטגוריה", "כמות"]
                 col1, col2 = st.columns([0.9, 0.1])
                 with col1:
-                    st.header("📈 תפלגות הסיווגים לפי קטגוריה")
+                    st.header("📈 התפלגות הסיווגים לפי קטגוריה")
                 with col2:
                     all_categories = pd.Series(classes, name="קטגוריה")
                     chart_data_full = pd.merge(
