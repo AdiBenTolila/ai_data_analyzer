@@ -75,7 +75,7 @@ def get_classes(texts, classes, retries=2, delay=5, client=gemini_clients[0],upd
     if not classes:
         raise ValueError("No classes provided for classification.")
     if not texts:
-        return None
+        return []
     class Output(BaseModel):
         explanation: str
         category: Literal[tuple(classes)]
@@ -111,7 +111,7 @@ def get_classes(texts, classes, retries=2, delay=5, client=gemini_clients[0],upd
                 raise e
     if update_progress:
         update_progress()
-    return None
+    return []
 
 client_id = -1
 
