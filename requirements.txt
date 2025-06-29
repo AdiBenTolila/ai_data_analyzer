@@ -1,0 +1,8 @@
+pandas
+openpyxl
+google-genai
+tornado!=6.5.0
+streamlit
+streamlit-tags
+openai
+XlsxWriter
