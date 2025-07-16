@@ -96,7 +96,12 @@ def get_classes(texts, classes, retries=2, delay=5, client=gemini_clients[0],upd
             #remove double quotes from the output
             if update_progress:
                 update_progress()
-            return response.parsed
+            outputs = response.parsed
+            filtered_outputs = [r for r in outputs if r.category != 'אחר']
+            if filtered_outputs:
+                return filtered_outputs
+            else:
+                return outputs
         except ClientError as e:
             if e.code == 429:
                 print("Rate Limit Error:", e)
