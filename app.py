@@ -28,8 +28,9 @@ if st.session_state.get("dataframe") is not None:
 elif uploaded_file:
     if uploaded_file.name.endswith('.csv'):
         selected_sheet = "CSV file"
-        df = pd.read_csv(uploaded_file, encoding='utf-8', on_bad_lines='skip')
-        st.session_state["dataframe"] = df
+        with st.spinner("Reading file...", show_time=True):
+            df = pd.read_csv(uploaded_file, encoding='utf-8', on_bad_lines='skip')
+            st.session_state["dataframe"] = df
 
     else:
         excel_data = pd.ExcelFile(uploaded_file)
@@ -37,8 +38,9 @@ elif uploaded_file:
         selected_sheet = st.selectbox("Choose a sheet", sheet_names, key=f"sheet_select_{uploaded_file.name}")
 
         if selected_sheet != "Select a sheet...":
-            df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, skiprows=0)
-            st.session_state["dataframe"] = df
+            with st.spinner("Reading file...", show_time=True):
+                df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, skiprows=0)
+                st.session_state["dataframe"] = df
 
     if "last_uploaded_file" not in st.session_state or uploaded_file.name != st.session_state["last_uploaded_file"]:
         st.session_state["suggested_categories"] = []
