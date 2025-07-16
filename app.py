@@ -5,6 +5,21 @@ import altair as alt
 from models import first_classification_ai, classify_data, first_classification_ai_gpt, classify_data_gpt
 import io
 
+
+def cat_str_to_lst(cat_str):
+    if isinstance(cat_str, str):
+        return [c.strip() for c in cat_str.split(',') if c.strip()]
+    elif isinstance(cat_str, list):
+        return [c.strip() for c in cat_str if c.strip()]
+    return cat_str
+
+def cat_lst_to_str(cat_lst):
+    if isinstance(cat_lst, list):
+        return ', '.join(cat_lst)
+    elif isinstance(cat_lst, str):
+        return ', '.join([c.strip() for c in cat_lst.split(',') if c.strip()])
+    return cat_lst
+
 st.markdown("""
     <style>
     @media only screen and (min-width: 600px) {
@@ -23,6 +38,17 @@ df = None
 selected_sheet = None
 
 # If a file is uploaded
+if uploaded_file is None or uploaded_file.name != st.session_state.get("last_uploaded_file"):
+    st.session_state["suggested_categories"] = []
+    st.session_state["regenerate_count"] = 0
+    st.session_state["last_selected_sheet"] = None
+    if "last_uploaded_file" in st.session_state:
+        del st.session_state["last_uploaded_file"]
+    if 'dataframe' in st.session_state:
+        del st.session_state["dataframe"]
+    if 'classified_data' in st.session_state:
+        del st.session_state['classified_data']
+    df = None
 if st.session_state.get("dataframe") is not None:
     df = st.session_state["dataframe"]
 elif uploaded_file:
@@ -55,14 +81,6 @@ elif uploaded_file:
             st.session_state["suggested_categories"] = []
             st.session_state["regenerate_count"] = 0
             st.session_state["last_selected_sheet"] = selected_sheet
-else:
-    st.session_state["suggested_categories"] = []
-    st.session_state["regenerate_count"] = 0
-    st.session_state["last_selected_sheet"] = None
-    st.session_state["last_uploaded_file"] = None
-    st.session_state["dataframe"] = None
-    if 'classified_data' in st.session_state:
-        del st.session_state['classified_data']
 if 'last_uploaded_file' in st.session_state:
     if df is not None:
         st.success("File uploaded and read successfully!")
@@ -77,7 +95,18 @@ if 'last_uploaded_file' in st.session_state:
         columns_to_classify = st.multiselect("Select one or more columns to classify:", df.columns, key=f'{st.session_state["last_uploaded_file"]}_{st.session_state["last_selected_sheet"]}_selectCols')
         if not columns_to_classify:
             st.session_state["suggested_categories"] = []
+            st.session_state["regenerate_count"] = 0
+            st.session_state["selected_columns"] = []
+            if "classified_data" in st.session_state:
+                del st.session_state["classified_data"]
         else:
+            if "selected_columns" in st.session_state and st.session_state["selected_columns"] != columns_to_classify:
+                st.session_state["suggested_categories"] = []
+                st.session_state["regenerate_count"] = 0
+                if "classified_data" in st.session_state:
+                    del st.session_state["classified_data"]
+
+            st.session_state["selected_columns"] = columns_to_classify
             # 3. Regenerate button
             if st.button("🔁 Regenerate Suggestions"):
                 if not columns_to_classify:
@@ -100,6 +129,10 @@ if 'last_uploaded_file' in st.session_state:
                     maxtags=20,
                     key=f"tag-input-{st.session_state['regenerate_count']}",
                 )
+                if classes != st.session_state["suggested_categories"]:
+                    st.session_state["suggested_categories"] = classes
+                    if "classified_data" in st.session_state:
+                        del st.session_state["classified_data"]
             else:
                 classes = []
 
@@ -112,10 +145,11 @@ if 'last_uploaded_file' in st.session_state:
                 with st.spinner("Classifying...", show_time=True):
                     data_to_classify = df[columns_to_classify]
                     
-                    result = classify_data(data_to_classify.values, classes, num_thread=4)
+                    result = classify_data(data_to_classify.to_dict(orient='records'), classes, num_thread=4)
 
                     df['AI סיווג'] = result
                 st.session_state["classified_data"] = df
+                st.session_state["original_columns"] = df.columns.tolist()
                 st.success("Classification completed!")
 
             if "classified_data" in st.session_state:
@@ -129,23 +163,46 @@ if 'last_uploaded_file' in st.session_state:
 
                 # Convert list to comma-separated strings for editing
                 df_display = df.copy()
-                df_display['AI סיווג'] = df_display['AI סיווג'].apply(
-                    lambda l: ', '.join(l) if isinstance(l, list) else l
-                )
+                df_display['AI סיווג'] = df_display['AI סיווג'].apply(cat_lst_to_str)
 
+                # Ensure 'AI סיווג' and selected columns exist
+                cols_first = columns_to_classify.copy()
+                if "AI סיווג" in df_display.columns:
+                    cols_first.append("AI סיווג")
+
+                # All other columns (not in the first group)
+                remaining_cols = [col for col in df_display.columns if col not in cols_first]
+
+                # Final order
+                reordered_cols = cols_first + remaining_cols
+
+                
                 if edit:
-                    edited_df = st.data_editor(df_display, key="editable_df", num_rows="dynamic", use_container_width=True, hide_index=True)
-
-                    # Save back to session_state only if edited_df is different
-                    if edited_df is not None and not edited_df.equals(df_display):
-                        # Convert back to list
-                        edited_df['AI סיווג'] = edited_df['AI סיווג'].apply(
-                            lambda s: s.split(', ') if isinstance(s, str) else s
-                        )
-                        st.session_state["classified_data"] = edited_df
-                        st.rerun()
+                    st.session_state["in_edit_mode"] = True
+                    all_valid_categories = set(st.session_state.get("suggested_categories", []))
+                    edited_df = st.data_editor(df_display[reordered_cols], key="editable_df", num_rows="dynamic", use_container_width=True, hide_index=True,column_config={
+                            'AI סיווג': st.column_config.TextColumn(
+                                "AI סיווג",
+                                validate=fr"^\s*({'|'.join(all_valid_categories)})(\s*,\s*({'|'.join(all_valid_categories)}))*\s*$",
+                            )
+                        })
+                    edited_df['AI סיווג'] = edited_df['AI סיווג'].apply(cat_lst_to_str)
+                    st.session_state["edited_df"] = edited_df
                 else:
-                    st.dataframe(df)
+                    if "in_edit_mode" in st.session_state and st.session_state["in_edit_mode"] and "edited_df" in st.session_state:
+                        edited_df = st.session_state["edited_df"]
+                        if edited_df is not None and not edited_df.equals(df_display):
+                        # Convert back to list
+                            edited_df['AI סיווג'] = edited_df['AI סיווג'].apply(cat_str_to_lst)
+                            st.session_state["classified_data"] = edited_df
+                        del st.session_state["in_edit_mode"]
+                        del st.session_state["edited_df"]
+                        st.rerun()
+                    # Prepare reordered display: [selected columns] + [AI סיווג] + [rest]
+                    df_display = st.session_state["classified_data"]
+                    # Show table in the desired order
+                    st.dataframe(df_display[reordered_cols])
+
 
             if "AI סיווג" in df.columns and st.session_state.get("classified_data") is not None:
                 exploded_df = df.explode('AI סיווג')['AI סיווג']
@@ -165,10 +222,8 @@ if 'last_uploaded_file' in st.session_state:
                     with pd.ExcelWriter(full_excel_buffer, engine="xlsxwriter") as writer:
 
                         df_export = df.copy()
-                        df_export['AI סיווג'] = df_export['AI סיווג'].apply(
-                            lambda l: ', '.join(l) if isinstance(l, list) else l
-                        )
-                        df_export.to_excel(writer, index=False, sheet_name="Classified Data")
+                        df_export['AI סיווג'] = df_export['AI סיווג'].apply(cat_lst_to_str)
+                        df_export[st.session_state["original_columns"]].to_excel(writer, index=False, sheet_name="Classified Data")
 
                         # גיליון נוסף: טבלת שכיחויות
                         chart_data_full.to_excel(writer, index=False, sheet_name="Frequency", startrow=1, header=False)
@@ -223,3 +278,4 @@ if 'last_uploaded_file' in st.session_state:
                     height=400
                 )
                 st.altair_chart(chart)
+

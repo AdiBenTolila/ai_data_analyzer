@@ -74,11 +74,15 @@ def first_classification_ai(df, columns_to_classify):
 def get_classes(texts, classes, retries=2, delay=5, client=gemini_clients[0],update_progress=None):
     if not classes:
         raise ValueError("No classes provided for classification.")
-    if not texts:
+    if texts is None or len(texts) == 0 or all(str(text).strip() == "" for text in texts.values()):
         return []
     class Output(BaseModel):
         explanation: str
         category: Literal[tuple(classes)]
+    if len(texts) > 1:
+        prompt_content = "\n".join([f"{key}: {text}" for key,text in texts.items()])
+    else:
+        prompt_content = str(next(iter(texts.values())))
     for _ in range(retries + 1):
         try:
             response = client.models.generate_content(
@@ -91,7 +95,7 @@ def get_classes(texts, classes, retries=2, delay=5, client=gemini_clients[0],upd
                     # responseSchema=Output,
                     temperature=0.0,
                 ),
-                contents="\n".join(texts),
+                contents=prompt_content,
             )
             #remove double quotes from the output
             if update_progress:
@@ -102,6 +106,7 @@ def get_classes(texts, classes, retries=2, delay=5, client=gemini_clients[0],upd
                 return filtered_outputs
             else:
                 return outputs
+        
         except ClientError as e:
             if e.code == 429:
                 print("Rate Limit Error:", e)
@@ -186,4 +191,3 @@ def classify_data_gpt(data, classes, num_thread=8, retries=2, delay=5):
 
     return [list(set([r.category for r in res.outputs])) for res in results]
     # return [r.category if r else None for r in results]
-
