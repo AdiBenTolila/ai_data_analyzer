@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import pandas as pd
 from streamlit_tags import st_tags
@@ -25,11 +23,14 @@ df = None
 selected_sheet = None
 
 # If a file is uploaded
-if uploaded_file:
-    
+if st.session_state.get("dataframe") is not None:
+    df = st.session_state["dataframe"]
+elif uploaded_file:
     if uploaded_file.name.endswith('.csv'):
         selected_sheet = "CSV file"
         df = pd.read_csv(uploaded_file, encoding='utf-8', on_bad_lines='skip')
+        st.session_state["dataframe"] = df
+
     else:
         excel_data = pd.ExcelFile(uploaded_file)
         sheet_names = ["Select a sheet..."] + excel_data.sheet_names
@@ -37,6 +38,7 @@ if uploaded_file:
 
         if selected_sheet != "Select a sheet...":
             df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, skiprows=0)
+            st.session_state["dataframe"] = df
 
     if "last_uploaded_file" not in st.session_state or uploaded_file.name != st.session_state["last_uploaded_file"]:
         st.session_state["suggested_categories"] = []
@@ -56,11 +58,9 @@ else:
     st.session_state["regenerate_count"] = 0
     st.session_state["last_selected_sheet"] = None
     st.session_state["last_uploaded_file"] = None
+    st.session_state["dataframe"] = None
     if 'classified_data' in st.session_state:
         del st.session_state['classified_data']
-
-
-
 if 'last_uploaded_file' in st.session_state:
     if df is not None:
         st.success("File uploaded and read successfully!")
@@ -73,7 +73,9 @@ if 'last_uploaded_file' in st.session_state:
 
         # 2. Multiselect input
         columns_to_classify = st.multiselect("Select one or more columns to classify:", df.columns, key=f'{st.session_state["last_uploaded_file"]}_{st.session_state["last_selected_sheet"]}_selectCols')
-        if columns_to_classify:
+        if not columns_to_classify:
+            st.session_state["suggested_categories"] = []
+        else:
             # 3. Regenerate button
             if st.button("🔁 Regenerate Suggestions"):
                 if not columns_to_classify:
@@ -219,4 +221,3 @@ if 'last_uploaded_file' in st.session_state:
                     height=400
                 )
                 st.altair_chart(chart)
-
