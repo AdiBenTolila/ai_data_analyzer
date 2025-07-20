@@ -4,20 +4,49 @@ from streamlit_tags import st_tags
 import altair as alt
 from models import first_classification_ai, classify_data, first_classification_ai_gpt, classify_data_gpt
 import io
+import re
 
+def extract_classes(s, valid_classes):
+    # Sort valid classes by length (longest first) to prioritize greedy match
+    sorted_classes = sorted(valid_classes, key=len, reverse=True)
+    
+    found = []
+    remaining = s
 
-def cat_str_to_lst(cat_str):
+    while remaining:
+        matched = False
+        for cls in sorted_classes:
+            # Try to match class at start of the string (with optional surrounding spaces)
+            pattern = r'^\s*' + re.escape(cls) + r'\s*(,|$)'
+            m = re.match(pattern, remaining)
+            if m:
+                found.append(cls)
+                # Remove matched portion including trailing comma
+                remaining = remaining[m.end():]
+                matched = True
+                break
+        if not matched:
+            # Unable to match anything — stop or raise an error
+            break
+    
+    return found
+
+def cat_str_to_lst(cat_str, classes):
     if isinstance(cat_str, str):
-        return [c.strip() for c in cat_str.split(',') if c.strip()]
+        return extract_classes(cat_str, classes)
     elif isinstance(cat_str, list):
         return [c.strip() for c in cat_str if c.strip()]
     return cat_str
 
-def cat_lst_to_str(cat_lst):
+def cat_lst_to_str(cat_lst, classes):
     if isinstance(cat_lst, list):
         return ', '.join(cat_lst)
     elif isinstance(cat_lst, str):
-        return ', '.join([c.strip() for c in cat_lst.split(',') if c.strip()])
+        matches = extract_classes(cat_lst, classes)
+        if matches:
+            return ', '.join([c.strip() for c in matches if c.strip()])
+        else:
+            return ''
     return cat_lst
 
 st.markdown("""
@@ -129,6 +158,12 @@ if 'last_uploaded_file' in st.session_state:
                     maxtags=20,
                     key=f"tag-input-{st.session_state['regenerate_count']}",
                 )
+                classes = [c.strip() for c in classes if c.strip()]
+                # handle invalid category names
+                if classes:
+                    invalid_classes = [c for c in classes if not re.match(r'^[\w\s(),]+$', c)]
+                    if invalid_classes:
+                        st.error(f"Invalid category names: {', '.join(invalid_classes)}. Please use only letters, numbers, spaces, commas, and parentheses.")
                 if classes != st.session_state["suggested_categories"]:
                     st.session_state["suggested_categories"] = classes
                     if "classified_data" in st.session_state:
@@ -138,7 +173,7 @@ if 'last_uploaded_file' in st.session_state:
 
             # Step 3: Classify
             count = 0
-            if classes and columns_to_classify and st.button("🚀 Run Classification"):    
+            if classes and columns_to_classify and not invalid_classes and st.button("🚀 Run Classification"):    
                 # df = df.head(200)
                 df = df.dropna(subset=columns_to_classify)
                 
@@ -163,7 +198,7 @@ if 'last_uploaded_file' in st.session_state:
 
                 # Convert list to comma-separated strings for editing
                 df_display = df.copy()
-                df_display['AI סיווג'] = df_display['AI סיווג'].apply(cat_lst_to_str)
+                df_display['AI סיווג'] = df_display['AI סיווג'].apply(lambda x: cat_lst_to_str(x, classes))
 
                 # Ensure 'AI סיווג' and selected columns exist
                 cols_first = columns_to_classify.copy()
@@ -180,20 +215,25 @@ if 'last_uploaded_file' in st.session_state:
                 if edit:
                     st.session_state["in_edit_mode"] = True
                     all_valid_categories = set(st.session_state.get("suggested_categories", []))
+
+                    escaped = sorted([cls.replace('(', r'\(').replace(')', r'\)') for cls in all_valid_categories], key=len, reverse=True)
+                    group = '|'.join(escaped)
+                    pattern = fr"^\s*({group})(\s*,\s*({group}))*\s*$"
+                    print("full_pattern", pattern)
                     edited_df = st.data_editor(df_display[reordered_cols], key="editable_df", num_rows="dynamic", use_container_width=True, hide_index=True,column_config={
                             'AI סיווג': st.column_config.TextColumn(
                                 "AI סיווג",
-                                validate=fr"^\s*({'|'.join(all_valid_categories)})(\s*,\s*({'|'.join(all_valid_categories)}))*\s*$",
+                                validate=f"^\s*({group})(\s*,\s*({group}))*\s*$",
                             )
                         })
-                    edited_df['AI סיווג'] = edited_df['AI סיווג'].apply(cat_lst_to_str)
+                    edited_df['AI סיווג'] = edited_df['AI סיווג'].apply(lambda x: cat_lst_to_str(x, classes))
                     st.session_state["edited_df"] = edited_df
                 else:
                     if "in_edit_mode" in st.session_state and st.session_state["in_edit_mode"] and "edited_df" in st.session_state:
                         edited_df = st.session_state["edited_df"]
                         if edited_df is not None and not edited_df.equals(df_display):
                         # Convert back to list
-                            edited_df['AI סיווג'] = edited_df['AI סיווג'].apply(cat_str_to_lst)
+                            edited_df['AI סיווג'] = edited_df['AI סיווג'].apply(lambda x: cat_str_to_lst(x, classes))
                             st.session_state["classified_data"] = edited_df
                         del st.session_state["in_edit_mode"]
                         del st.session_state["edited_df"]
@@ -222,23 +262,22 @@ if 'last_uploaded_file' in st.session_state:
                     with pd.ExcelWriter(full_excel_buffer, engine="xlsxwriter") as writer:
 
                         df_export = df.copy()
-                        df_export['AI סיווג'] = df_export['AI סיווג'].apply(cat_lst_to_str)
+                        df_export['AI סיווג'] = df_export['AI סיווג'].apply(lambda x: cat_lst_to_str(x, classes))
                         df_export[st.session_state["original_columns"]].to_excel(writer, index=False, sheet_name="Classified Data")
-
-                        # גיליון נוסף: טבלת שכיחויות
+                        # Add another sheet for the frequency chart
                         chart_data_full.to_excel(writer, index=False, sheet_name="Frequency", startrow=1, header=False)
 
                         workbook = writer.book
                         worksheet = writer.sheets["Frequency"]
 
-                        # כותרות
+                        # titles
                         header_format = workbook.add_format({'bold': True, 'bg_color': '#D7E4BC'})
                         worksheet.write('A1', 'קטגוריה', header_format)
                         worksheet.write('B1', 'כמות', header_format)
                         worksheet.set_column('A:A', 30)
                         worksheet.set_column('B:B', 10)
 
-                        # עיצוב צבעוני
+                        # colorful formatting
                         worksheet.conditional_format(f'B2:B{len(chart_data_full)+1}', {
                             'type': '3_color_scale',
                             'min_color': "#FFC7CE",
@@ -246,7 +285,7 @@ if 'last_uploaded_file' in st.session_state:
                             'max_color': "#C6EFCE"
                         })
 
-                        # גרף עמודות
+                        # column chart
                         chart = workbook.add_chart({'type': 'column'})
                         chart.add_series({
                             'name':       'שכיחויות',
@@ -260,14 +299,13 @@ if 'last_uploaded_file' in st.session_state:
                         chart.set_style(10)
                         worksheet.insert_chart('D2', chart, {'x_scale': 1.5, 'y_scale': 1.5})
 
-                    # כפתור להורדת קובץ מלא
-                    st.download_button(
-                        label="📥הורד",
-                        # : סיווגים + תפלגות + גרף
-                        data=full_excel_buffer.getvalue(),
-                        file_name="classified_data_and_distribution.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                    if not ("in_edit_mode" in st.session_state and st.session_state["in_edit_mode"] and "edited_df" in st.session_state):
+                        st.download_button(
+                                label="📥הורד",
+                                data=full_excel_buffer.getvalue(),
+                                file_name="classified_data_and_distribution.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
 
                 chart = alt.Chart(chart_data).mark_bar().encode(
                     x=alt.X("קטגוריה:N", sort="-y"),
