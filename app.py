@@ -219,7 +219,6 @@ if 'last_uploaded_file' in st.session_state:
                     escaped = sorted([cls.replace('(', r'\(').replace(')', r'\)') for cls in all_valid_categories], key=len, reverse=True)
                     group = '|'.join(escaped)
                     pattern = fr"^\s*({group})(\s*,\s*({group}))*\s*$"
-                    print("full_pattern", pattern)
                     edited_df = st.data_editor(df_display[reordered_cols], key="editable_df", num_rows="dynamic", use_container_width=True, hide_index=True,column_config={
                             'AI סיווג': st.column_config.TextColumn(
                                 "AI סיווג",
