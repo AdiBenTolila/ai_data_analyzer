@@ -26,6 +26,7 @@ Instructions:
 - Output the categories in **Hebrew only** (no English).
 - The categories should be **general**, not overly specific.
 - The categories must be **relevant** to the data entries provided.
+- Use only letters, numbers, spaces, commas, and parentheses.
 - The final category must always be **"אחר"** (meaning "other").
 
 Respond only with the list of suggested categories in Hebrew.
