@@ -222,7 +222,7 @@ if 'last_uploaded_file' in st.session_state:
                     edited_df = st.data_editor(df_display[reordered_cols], key="editable_df", num_rows="dynamic", use_container_width=True, hide_index=True,column_config={
                             'AI סיווג': st.column_config.TextColumn(
                                 "AI סיווג",
-                                validate=f"^\s*({group})(\s*,\s*({group}))*\s*$",
+                                validate=fr"^\s*({group})(\s*,\s*({group}))*\s*$",
                             )
                         })
                     edited_df['AI סיווג'] = edited_df['AI סיווג'].apply(lambda x: cat_lst_to_str(x, classes))
