@@ -59,7 +59,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
+st.set_page_config(page_title="Mashov AI", layout="wide")
 st.title("📊 Mashov AI")
 uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "csv"])
 
