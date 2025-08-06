@@ -60,7 +60,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Excel Q&A Assistant")
+st.title("📊 Mashov AI")
 uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "csv"])
 
 df = None
@@ -161,7 +161,7 @@ if 'last_uploaded_file' in st.session_state:
                 classes = [c.strip() for c in classes if c.strip()]
                 # handle invalid category names
                 if classes:
-                    invalid_classes = [c for c in classes if not re.match(r'^[\w\s(),]+$', c)]
+                    invalid_classes = [c for c in classes if not re.match(r"^[\w\s(),']+$", c)]
                     if invalid_classes:
                         st.error(f"Invalid category names: {', '.join(invalid_classes)}. Please use only letters, numbers, spaces, commas, and parentheses.")
                 if classes != st.session_state["suggested_categories"]:
