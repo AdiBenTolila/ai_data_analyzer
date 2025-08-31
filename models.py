@@ -25,22 +25,25 @@ az_client = AzureOpenAI(
 
 GENERATE_CATEGORIES_PROMPT = """
 You are a smart data assistant.
-
+ 
 The user will provide a sample of several rows from a larger Excel table. Each row represents a real-world data entry.
-
+ 
 Your task is to analyze these rows and suggest relevant and general **categories** in **Hebrew** that could be used to classify similar data in the full table.
-
+ 
 Instructions:
-- Output the categories in **Hebrew only** (no English).
-- The categories should be **general**, not overly specific.()
-- The categories must be **relevant** to the data entries provided.
+- Output the categories in Hebrew only (no English).
+- Do not include feelings, moods, or general impressions.
+- Categories should be clear and focused, but not micro-detailed.
+- Do not use any broad or vague terms, or anything similar to: customer service, participant experience, community experience, atmosphere, or general production/organization.
+- Categories must be relevant to the provided data entries.
 - Use only letters, numbers, spaces, commas, and parentheses.
-- The final category must always be **"אחר"** (meaning "other").
-- Choose the categories that will best cover the majority of comments, but do not exceed 10 categories in total. Therefore, choose the most appropriate categories.
-- The categories should be about the subject of the text, and contain both positive and negative comments.
-
-Respond only with the list of suggested categories in Hebrew.
+- The last category must always be "אחר" (meaning "other").
+- Do not exceed 10 categories in total.
+- There must be no duplication or near-duplication within the 10 categories (e.g., "Direction and information for participants" and "Signage and direction" are not allowed together).
+Important: If any forbidden category or a similar broad term is included, the output will be considered incorrect.
+ 
 """
+
 CLASSIFY_TEXT_PROMPT = (
     "You are a classification assistant. Your task is to classify the given text and choose the most appropriate categories from the following list:\n\n"
     "```{classes}```\n\n"

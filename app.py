@@ -408,7 +408,8 @@ if 'last_uploaded_file' in st.session_state:
                         all_categories.to_frame(), chart_data, on="קטגוריה", how="left"
                     )
                     chart_data_full["כמות"] = chart_data_full["כמות"].fillna(0).astype(int)
-          
+                    chart_data_full = chart_data_full.sort_values(by="כמות", ascending=False).reset_index(drop=True)
+
                     full_excel_buffer = io.BytesIO()
                     with pd.ExcelWriter(full_excel_buffer, engine="xlsxwriter") as writer:
 
