@@ -305,12 +305,10 @@ def get_classes_azure(texts, classes, retries=2, delay=5, client=None, update_pr
             )
 
         except RateLimitError as e:
-            if e.code == 429:
-                print("Rate Limit Error:", e)
-                time.sleep(delay)
-                continue
-            else:
-                raise e
+            print("Rate Limit Error:", e)
+            time.sleep(delay)
+            continue
+
         except InternalServerError as e:
             print("Internal Server Error:", e)
             time.sleep(delay)
@@ -325,7 +323,7 @@ def get_classes_azure(texts, classes, retries=2, delay=5, client=None, update_pr
         tag='ניטרלי'
     )
 
-def classify_data_azure(data, classes, num_thread=12, retries=2, delay=5):
+def classify_data_azure(data, classes, num_thread=8, retries=2, delay=5):
     if not classes:
         raise ValueError("No classes provided for classification.")
 
