@@ -230,20 +230,18 @@ def first_classification_ai_azure(df, columns_to_classify):
 def get_classes_azure(texts, classes, retries=2, delay=5, client=None, update_progress=None):
     if not classes:
         raise ValueError("No classes provided for classification.")
-    if texts is None or len(texts) == 0 or all(str(text).strip() == "" for text in texts.values()):
-        return {
-            "explanation": "",
-            "categories": [],
-            "tag": 'ניטרלי'
-        }
-
     available_tags = ('מרוצה', 'לא מרוצה','ניטרלי')
-
+    
     class Output(BaseModel):
         explanation: str
         categories: List[Literal[tuple(classes)]]
         tag: Literal[available_tags]
-
+    if texts is None or len(texts) == 0 or all(str(text).strip() == "" for text in texts.values()):
+        return Output(
+                    explanation="",
+                    categories=["אחר"],
+                    tag='ניטרלי'
+                )
     if len(texts) > 1:
         prompt_content = "\n".join([f"{key}: {text}" for key, text in texts.items()])
     else:
