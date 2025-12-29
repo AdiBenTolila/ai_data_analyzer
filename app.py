@@ -171,7 +171,7 @@ if uploaded_file:
             st.session_state["tags_filter"] = []
             st.session_state["last_selected_sheet"] = selected_sheet
 else:
-    st.info("**Important Note:** The system uses Microsoft's AI. Please ensure that no sensitive or private information that could compromise user privacy is uploaded.")
+    st.info("**Important Note:** The system uses AI. Please ensure that no sensitive or private information that could compromise user privacy is uploaded.")
 if 'last_uploaded_file' in st.session_state:
     if df is not None:
         # st.success("File uploaded and read successfully!")
