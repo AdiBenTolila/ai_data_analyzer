@@ -6,3 +6,4 @@ streamlit
 streamlit-tags
 openai
 XlsxWriter
+scikit-learn
