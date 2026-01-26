@@ -1,2 +1,11 @@
 browser.gatherUsageStats = false
 
+ [theme]
+ base="light"
+ primaryColor="#5e95b4ff"
+ 
+
+ [theme.sidebar]
+ base="light"
+ primaryColor="#5e95b4ff"
+ backgroundColor="#eceaeaff"
