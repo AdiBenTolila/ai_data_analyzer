@@ -30,6 +30,10 @@ st.markdown("""
     img[alt="Logo"] {
         height: 3.5rem !important;
     }
+    section[data-testid="stSidebar"] {             
+            width: 500px !important;      
+    }
+ 
     </style>
 """, unsafe_allow_html=True)
 
@@ -398,11 +402,12 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                     worksheet_freq.write('B1', 'כמות', header_format)
                     worksheet_freq.set_column('A:A', 30)
                     worksheet_freq.set_column('B:B', 10)
-                    
+                    category_counts = full_df.explode('AI סיווג')['AI סיווג'].value_counts()
                     for idx, category in enumerate(all_categories, start=2):
                             worksheet_freq.write(f'A{idx}', category)
                             formula = f'=COUNTIF(\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row},"*{category}*")'
-                            worksheet_freq.write(f'B{idx}', formula)
+                            count = category_counts[category]
+                            worksheet_freq.write(f'B{idx}', formula, None, count)
                     
                     cat_end_row = len(all_categories) + 1
                     
@@ -445,10 +450,11 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                     worksheet_freq.write(start_row_tags, 1, 'כמות', header_format)
                     
                     # Write tags and create COUNTIF formulas
+                    tag_counts = full_df['AI תגים'].value_counts()
                     for idx, tag in enumerate(all_tags, start=start_row_tags + 1):
                         worksheet_freq.write(idx, 0, tag)
                         formula = f'=COUNTIF(\'Classified Data\'!${tags_col_letter}${data_start_row}:${tags_col_letter}${data_end_row},"{tag}")'
-                        worksheet_freq.write(idx, 1, formula)
+                        worksheet_freq.write(idx, 1, formula, None, tag_counts[tag])
                     
                     tags_end_row = start_row_tags + len(all_tags) + 1
                     
@@ -481,13 +487,15 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                         worksheet_breakdown.write(0, pivot_start_col + tag_idx + 1, tag, header_format)
                     
                     # Write categories and FORMULAS to count occurrences
+                    category_tag_counts = full_df.explode('AI סיווג').groupby(['AI סיווג', 'AI תגים']).size()
                     for cat_idx, category in enumerate(all_categories, start=1):
                         worksheet_breakdown.write(cat_idx, pivot_start_col, category)
                         for tag_idx, tag in enumerate(all_tags):
                             col_letter = col_to_letter(pivot_start_col + tag_idx + 1)
                             # COUNTIFS formula to count rows where both category AND tag match
                             formula = f'=SUMPRODUCT((ISNUMBER(SEARCH("{category}",\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row})))*(\'Classified Data\'!${tags_col_letter}${data_start_row}:${tags_col_letter}${data_end_row}="{tag}"))'
-                            worksheet_breakdown.write(cat_idx, pivot_start_col + tag_idx + 1, formula)
+                            count = category_tag_counts.get((category,tag), 0)
+                            worksheet_breakdown.write(cat_idx, pivot_start_col + tag_idx + 1, formula, None, count)
                     
                     pivot_end_row = len(all_categories) + 1
                     pivot_end_col_letter = col_to_letter(pivot_start_col + len(all_tags))
@@ -547,7 +555,8 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                             col_letter = col_to_letter(pivot2_start_col + cat_idx + 1)
                             # COUNTIFS formula to count rows where both tag AND category match
                             formula = f'=SUMPRODUCT((\'Classified Data\'!${tags_col_letter}${data_start_row}:${tags_col_letter}${data_end_row}="{tag}")*(ISNUMBER(SEARCH("{category}",\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row}))))'
-                            worksheet_breakdown.write(pivot2_start_row + tag_idx, pivot2_start_col + cat_idx + 1, formula)
+                            count = category_tag_counts.get((category,tag), 0)
+                            worksheet_breakdown.write(pivot2_start_row + tag_idx, pivot2_start_col + cat_idx + 1, formula, None, count)
                     
                     pivot2_end_row = pivot2_start_row + len(all_tags)
                     pivot2_start_col_letter = col_to_letter(pivot2_start_col)
