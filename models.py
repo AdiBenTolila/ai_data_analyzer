@@ -43,24 +43,28 @@ Instructions:
 Important: If any forbidden category or a similar broad term is included, the output will be considered incorrect.
  
 """
-
 CLASSIFY_TEXT_PROMPT = (
     "You are a classification assistant. Your task is to classify the given text and choose the most appropriate categories from the following list:\n\n"
     "```{classes}```\n\n"
     "Also, choose one tag that describes best the opinion in the text, it should be one of the following tags:\n"
-    "- מרוצה: the text expresses satisfaction with the service or product.\n"
+    "- מרוצה: the text expresses satisfaction with the service or product(Short positive messages (e.g. thanks, praise, ratings, positive emojis)).\n"
+    # "- לא מרוצה: the text expresses dissatisfaction with the service or product(Even if the tone is objective or polite).\n"
     "- לא מרוצה: the text expresses dissatisfaction with the service or product.\n"
     "- ניטרלי: the text is neutral and does not express a clear opinion.\n"
+    # "Do not classify a text as ניטרלי if it describes a situation where the customer's needs were not met."
+
     "Given a text, return explanations and category names list\n\n"
     "Rules:\n"
     "1. You have to select one or more categories.\n"
     "2. Before selecting categories and tag, **explain** why you chose them.\n"
     "3. If you select ANY category other than 'אחר', then 'אחר' MUST NOT appear in your answer.\n"
-    "4. If there are NO matching categories at all, then return ONLY 'אחר'.\n"
+    # "4. If there are NO matching categories at all, then return ONLY 'אחר'.\n"
+    "4. Use 'אחר' ONLY if the text has absolutely no relation to any provided category.you MUST map it to the most relevant category from the list even if the match is partial.\n"
     "5. Do not choose the same category twice.\n"
     "6. There must be at least 1 category and not more than 2 categories for the text.\n\n"
+    "{prompt_text}"
 )
-
+ 
 CLASSIFY_TEXT_PROMPT_ONE = (
     "You are a classification assistant. Your task is to assign the most suitable category to the given feedback text based on the following list of categories:\n\n"
     "{classes}\n\n"
@@ -227,39 +231,45 @@ def first_classification_ai_azure(df, columns_to_classify):
     classes = response.choices[0].message.parsed.categories
     return classes
 
-def get_classes_azure(texts, classes, retries=2, delay=5, client=None, update_progress=None):
+def get_classes_azure(texts, classes, prompt_text="", retries=2, delay=5, client=None, update_progress=None, temperature = 0, top_p = 0):
     if not classes:
         raise ValueError("No classes provided for classification.")
     available_tags = ('מרוצה', 'לא מרוצה','ניטרלי')
-    
+
     class Output(BaseModel):
         explanation: str
         categories: List[Literal[tuple(classes)]]
         tag: Literal[available_tags]
+    
     if texts is None or len(texts) == 0 or all(str(text).strip() == "" for text in texts.values()):
         return Output(
-                    explanation="",
-                    categories=["אחר"],
-                    tag='ניטרלי'
-                )
+            explanation="",
+            categories=[],
+            tag='ניטרלי'
+        )
+
     if len(texts) > 1:
         prompt_content = "\n".join([f"{key}: {text}" for key, text in texts.items()])
     else:
         prompt_content = str(next(iter(texts.values())))
 
+    if prompt_text != "":
+        prompt_text_ = f"הנחיות נוספות למודל: {prompt_text}\n"
+    else:
+        prompt_text_=""
+
     messages_model=[
-                    {"role": "system", "content": CLASSIFY_TEXT_PROMPT.format(classes=classes)},
-                    {"role": "user", "content": prompt_content}
-                ]
+            {"role": "system", "content": CLASSIFY_TEXT_PROMPT.format(classes=classes, prompt_text=prompt_text_)},
+            {"role": "user", "content": prompt_content}
+    ]
     for attempt in range(retries + 1):
         try:
             response = az_client.beta.chat.completions.parse(
                 model=st.secrets["azure"]["model_name"],
                 messages=messages_model,
-                temperature=0,
+                temperature = temperature,
                 response_format=Output,
             )
-
             if update_progress:
                 update_progress()
 
@@ -283,7 +293,7 @@ def get_classes_azure(texts, classes, retries=2, delay=5, client=None, update_pr
                 if attempt < retries:
                     continue
                 else:
-                    return Output(explanation="", categories=["אחר"], tag="ניטרלי")
+                    return Output(explanation="", categories=[], tag="ניטרלי")
 
             return output
         
@@ -291,16 +301,17 @@ def get_classes_azure(texts, classes, retries=2, delay=5, client=None, update_pr
             if "content_filter" in str(e):
                 return Output(
                     explanation="",
-                    categories=['אחר'],
+                    categories=[],
                     tag='ניטרלי'
                 )
             raise e
         except ContentFilterFinishReasonError as e:
             return Output(
                 explanation="",
-                categories=['אחר'],
+                categories=[],
                 tag='ניטרלי'
             )
+        
 
         except RateLimitError as e:
             print("Rate Limit Error:", e)
@@ -317,15 +328,37 @@ def get_classes_azure(texts, classes, retries=2, delay=5, client=None, update_pr
 
     return Output(
         explanation="",
-        categories=["אחר"],
+        categories=[],
         tag='ניטרלי'
     )
 
-def classify_data_azure(data, classes, num_thread=8, retries=2, delay=5):
+def classify_data_azure(data, classes, prompt_text ,num_thread=16, retries=2, delay=5):
     if not classes:
         raise ValueError("No classes provided for classification.")
 
     with ThreadPool(num_thread) as pool:
-        results = pool.starmap(get_classes_azure, [(val, classes, retries, delay) for val in data])
+        results = pool.starmap(get_classes_azure, [(val, classes, prompt_text, retries, delay) for val in data])
 
     return [r.categories if r else None for r in results], [r.tag if r else None for r in results]
+
+def translate_text_azure(text, target_language="hebrew", retries=2, delay=5):
+    class TranslationOutput(BaseModel):
+        translated_text: str
+    for _ in range(retries + 1):
+        try:
+            response = az_client.beta.chat.completions.parse(
+                model=st.secrets["azure"]["translation_model_name"],
+                messages=[
+                    {"role": "system", "content": f"You are a translation assistant that translates text to {target_language}."},
+                    {"role": "user", "content": text}
+                ],
+                response_format=TranslationOutput,
+                temperature=0,
+            )
+            return response.choices[0].message.parsed.translated_text
+        
+        except Exception as e:
+            print("Translation error:", e)
+            time.sleep(delay)
+    return text
+    
