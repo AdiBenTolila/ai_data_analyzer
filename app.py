@@ -30,9 +30,6 @@ st.markdown("""
     img[alt="Logo"] {
         height: 3.5rem !important;
     }
-    section[data-testid="stSidebar"] {             
-            width: 500px !important;      
-    }
  
     </style>
 """, unsafe_allow_html=True)
