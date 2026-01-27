@@ -252,10 +252,7 @@ def get_classes_azure(texts, classes, prompt_text="", retries=2, delay=5, client
         prompt_content = "\n".join([f"{key}: {text}" for key, text in texts.items()])
     else:
         prompt_content = str(next(iter(texts.values())))
-    # prompt_text = """ אתה מקבל סקר בנוגע למסעדה של עיריית ירושלים, אנא תתאים את הקטגוריות בהתאם.
-    #                 ואל תהיה נוקשה עם הקטגוריה מרוצה, אם מישהו אמר תודה או מילה ניטרלית כלשהיאו הכל טוב או דברים בסגנון זאת אומרת שהוא מרוצה מהשירות
-    #                 """
-    # prompt_text = ""
+
     if prompt_text != "":
         prompt_text_ = f"הנחיות נוספות למודל: {prompt_text}\n"
     else:

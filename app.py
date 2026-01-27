@@ -345,24 +345,29 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
             chart_data_full = chart_data_full.sort_values(by="כמות", ascending=False).reset_index(drop=True)
             def download_excel(columns=st.session_state["original_columns"]):
                 full_excel_buffer = io.BytesIO()
-                with pd.ExcelWriter(full_excel_buffer, engine="xlsxwriter") as writer:
-                    # full_df = st.session_state["classified_data"]
+                with pd.ExcelWriter(full_excel_buffer, engine="xlsxwriter", engine_kwargs={'options': {'nan_inf_to_errors': True}}) as writer:#TODO
                     df_export = full_df.copy()
+                    
                     # Join lists into comma-separated strings for export
                     def _join_if_iterable(x):
                         if isinstance(x, (list, tuple, set)):
                             return ", ".join(map(str, x))
                         return x
+                    
                     if "AI סיווג" in df_export.columns:
                         df_export["AI סיווג"] = df_export["AI סיווג"].apply(_join_if_iterable)
+                    
                     # Write main data sheet
                     df_export[columns].to_excel(writer, index=False, sheet_name="Classified Data")
+                    
                     # Get workbook and worksheet objects
                     workbook = writer.book
                     worksheet_data = writer.sheets["Classified Data"]
+                    
                     # Find column indices for AI סיווג and AI תגים
                     col_classification = columns.index("AI סיווג") if "AI סיווג" in columns else None
                     col_tags = columns.index("AI תגים") if "AI תגים" in columns else None
+                    
                     # Convert column indices to Excel column letters
                     def col_to_letter(col_idx):
                         """Convert 0-based column index to Excel letter (0=A, 1=B, etc.)"""
@@ -373,29 +378,35 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                             letter = chr(col_idx % 26 + 65) + letter
                             col_idx //= 26
                         return letter
+                    
                     classification_col_letter = col_to_letter(col_classification) if col_classification is not None else None
                     tags_col_letter = col_to_letter(col_tags) if col_tags is not None else None
+                    
                     # Data starts at row 2 (row 1 has headers)
                     data_start_row = 2
                     data_end_row = len(df_export) + 1
+                    
                     # Create Frequency sheet
                     worksheet_freq = workbook.add_worksheet('Frequency')
-                    exploded_df = full_df.explode('AI סיווג')
-                    all_categories = exploded_df['AI סיווג'].unique().tolist() if 'AI סיווג' in full_df.columns else []
+                    all_categories = classes
                     all_tags = full_df['AI תגים'].unique().tolist() if 'AI תגים' in full_df.columns else []
                     # Format for headers
                     header_format = workbook.add_format({'bold': True, 'bg_color': '#D7E4BC'})
+                    
                     # ===== SECTION 1: Category Distribution =====
                     worksheet_freq.write('A1', 'קטגוריה', header_format)
                     worksheet_freq.write('B1', 'כמות', header_format)
                     worksheet_freq.set_column('A:A', 30)
                     worksheet_freq.set_column('B:B', 10)
+                    category_counts = full_df.explode('AI סיווג')['AI סיווג'].value_counts()
                     for idx, category in enumerate(all_categories, start=2):
-                        worksheet_freq.write(f'A{idx}', category)
-                        formula = f'=COUNTIF(\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row},"*{category}*")'
-                        worksheet_freq.write(f'B{idx}', formula)
+                            worksheet_freq.write(f'A{idx}', category)
+                            formula = f'=COUNTIF(\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row},"*{category}*")'
+                            count = category_counts[category]
+                            worksheet_freq.write(f'B{idx}', formula, None, count)
+                    
                     cat_end_row = len(all_categories) + 1
- 
+                    
                     # Convert to Excel Table
                     worksheet_freq.add_table(f'A1:B{cat_end_row}', {
                         'name': 'CategoryTable',
@@ -406,13 +417,13 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                         'style': 'Table Style Light 9'
                     })
                     
-                    cat_end_row = len(all_categories) + 1
                     worksheet_freq.conditional_format(f'B2:B{cat_end_row}', {
                         'type': '3_color_scale',
                         'min_color': "#FFC7CE",
                         'mid_color': "#FFEB9C",
                         'max_color': "#C6EFCE"
                     })
+                    
                     # Chart 1: Column chart - Category distribution
                     chart1 = workbook.add_chart({'type': 'column'})
                     chart1.add_series({
@@ -421,33 +432,164 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                         'values': f'=Frequency!$B$2:$B${cat_end_row}',
                         'fill': {'color': '#5DADE2'}
                     })
+                    chart1.show_blanks_as('zero')#TODO
                     chart1.set_legend({'none': True})
                     chart1.set_title({'name': 'התפלגות קטגוריות'})
                     chart1.set_x_axis({'name': 'קטגוריה'})
                     chart1.set_y_axis({'name': 'כמות'})
                     chart1.set_style(10)
                     worksheet_freq.insert_chart('H2', chart1, {'x_scale': 1.5, 'y_scale': 1.5})
+                    
                     # ===== SECTION 2: Tags Distribution =====
                     start_row_tags = cat_end_row + 15
                     worksheet_freq.write(start_row_tags, 0, 'תג', header_format)
                     worksheet_freq.write(start_row_tags, 1, 'כמות', header_format)
+                    
                     # Write tags and create COUNTIF formulas
+                    tag_counts = full_df['AI תגים'].value_counts()
                     for idx, tag in enumerate(all_tags, start=start_row_tags + 1):
                         worksheet_freq.write(idx, 0, tag)
-                        # Count how many times this tag appears
                         formula = f'=COUNTIF(\'Classified Data\'!${tags_col_letter}${data_start_row}:${tags_col_letter}${data_end_row},"{tag}")'
-                        worksheet_freq.write(idx, 1, formula)
-                    tags_end_row = start_row_tags + len(all_tags)+1
+                        worksheet_freq.write(idx, 1, formula, None, tag_counts[tag])
+                    
+                    tags_end_row = start_row_tags + len(all_tags) + 1
+                    
+                    # Chart 2: Pie chart - Tags distribution
                     chart3 = workbook.add_chart({'type': 'pie'})
                     chart3.add_series({
                         'name': 'התפלגות תגים',
                         'categories': f'=Frequency!$A${start_row_tags+2}:$A${tags_end_row}',
                         'values': f'=Frequency!$B${start_row_tags+2}:$B${tags_end_row}',
                     })
+                    chart3.show_blanks_as('zero')#TODO
                     chart3.set_title({'name': 'התפלגות תגים'})
                     chart3.set_style(10)
                     worksheet_freq.insert_chart('H27', chart3, {'x_scale': 1.5, 'y_scale': 1.5})
+                    
+                    # ===== SECTION 3: Category by Tags (tab2 graph) =====
+                    # Create a new sheet for the detailed breakdown
+                    worksheet_breakdown = workbook.add_worksheet('Category-Tags Breakdown')
+                    
+                    worksheet_breakdown.set_column('A:A', 30)
+                    worksheet_breakdown.set_column('B:B', 20)
+                    worksheet_breakdown.set_column('C:C', 10)
+                    
+                    # Simpler approach: Create a pivot-like structure with FORMULAS
+                    # Write pivot data starting from column A (for chart 4 - Categories by Tags)
+                    pivot_start_col = 0  # Column A (0-indexed: 0)
+                    worksheet_breakdown.write(0, pivot_start_col, 'קטגוריה', header_format)
+                    
+                    for tag_idx, tag in enumerate(all_tags):
+                        worksheet_breakdown.write(0, pivot_start_col + tag_idx + 1, tag, header_format)
+                    
+                    # Write categories and FORMULAS to count occurrences
+                    category_tag_counts = full_df.explode('AI סיווג').groupby(['AI סיווג', 'AI תגים']).size()
+                    for cat_idx, category in enumerate(all_categories, start=1):
+                        worksheet_breakdown.write(cat_idx, pivot_start_col, category)
+                        for tag_idx, tag in enumerate(all_tags):
+                            col_letter = col_to_letter(pivot_start_col + tag_idx + 1)
+                            # COUNTIFS formula to count rows where both category AND tag match
+                            formula = f'=SUMPRODUCT((ISNUMBER(SEARCH("{category}",\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row})))*(\'Classified Data\'!${tags_col_letter}${data_start_row}:${tags_col_letter}${data_end_row}="{tag}"))'
+                            count = category_tag_counts.get((category,tag), 0)
+                            worksheet_breakdown.write(cat_idx, pivot_start_col + tag_idx + 1, formula, None, count)
+                    
+                    pivot_end_row = len(all_categories) + 1
+                    pivot_end_col_letter = col_to_letter(pivot_start_col + len(all_tags))
+                    pivot_start_col_letter = col_to_letter(pivot_start_col)
+                    
+                    # Add conditional formatting to the data range
+                    if len(all_tags) > 0:
+                        data_range_start = col_to_letter(pivot_start_col + 1)
+                        data_range_end = col_to_letter(pivot_start_col + len(all_tags))
+                        worksheet_breakdown.conditional_format(f'{data_range_start}2:{data_range_end}{pivot_end_row}', {
+                            'type': '3_color_scale',
+                            'min_color': "#FFC7CE",
+                            'mid_color': "#FFEB9C",
+                            'max_color': "#C6EFCE"
+                        })
+                    
+                    # Chart 4: Stacked column - Categories distributed by tags
+                    chart4 = workbook.add_chart({'type': 'column', 'subtype': 'stacked'})
+                    tag_colors = {            
+                        'מרוצה': "#9DEEC6",      
+                        'לא מרוצה': "#E9B2AE",   
+                        'ניטרלי': "#F0E9AA"}        
+                    for tag_idx, tag in enumerate(all_tags):            
+                        col_letter = col_to_letter(pivot_start_col + tag_idx + 1)            
+                        series_config = {                
+                            'name': f'=\'Category-Tags Breakdown\'!${col_letter}$1',                
+                            'categories': f'=\'Category-Tags Breakdown\'!${pivot_start_col_letter}$2:${pivot_start_col_letter}${pivot_end_row}',                
+                            'values': f'=\'Category-Tags Breakdown\'!${col_letter}$2:${col_letter}${pivot_end_row}',            
+                        }            
+                        # Add color if tag is in our color mapping            
+                        if tag in tag_colors:                
+                            series_config['fill'] = {'color': tag_colors[tag]}            
+                        chart4.add_series(series_config)
+                    chart4.set_title({'name': 'התפלגות קטגוריות לפי תגים'})
+                    chart4.set_x_axis({'name': 'קטגוריה'})
+                    chart4.set_y_axis({'name': 'כמות'})
+                    chart4.set_style(10)
+                    
+                    # Position chart to the right of the data (with more space)
+                    chart_col = col_to_letter(len(all_tags) + 5)  # Added more columns for spacing
+                    worksheet_breakdown.insert_chart(f'{chart_col}2', chart4, {'x_scale': 1.5, 'y_scale': 1.5})
+                    
+                    # Chart 5: Stacked column - Tags distributed by categories (tab3)
+                    # Create another pivot with tags as rows and categories as columns
+                    pivot2_start_row = pivot_end_row + 13
+                    pivot2_start_col = 0  # Column A
+                    
+                    worksheet_breakdown.write(pivot2_start_row, pivot2_start_col, 'תג', header_format)
+                    
+                    for cat_idx, category in enumerate(all_categories):
+                        worksheet_breakdown.write(pivot2_start_row, pivot2_start_col + cat_idx + 1, category, header_format)
+                    
+                    # Write tags and FORMULAS to count occurrences
+                    for tag_idx, tag in enumerate(all_tags, start=1):
+                        worksheet_breakdown.write(pivot2_start_row + tag_idx, pivot2_start_col, tag)
+                        for cat_idx, category in enumerate(all_categories):
+                            col_letter = col_to_letter(pivot2_start_col + cat_idx + 1)
+                            # COUNTIFS formula to count rows where both tag AND category match
+                            formula = f'=SUMPRODUCT((\'Classified Data\'!${tags_col_letter}${data_start_row}:${tags_col_letter}${data_end_row}="{tag}")*(ISNUMBER(SEARCH("{category}",\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row}))))'
+                            count = category_tag_counts.get((category,tag), 0)
+                            worksheet_breakdown.write(pivot2_start_row + tag_idx, pivot2_start_col + cat_idx + 1, formula, None, count)
+                    
+                    pivot2_end_row = pivot2_start_row + len(all_tags)
+                    pivot2_start_col_letter = col_to_letter(pivot2_start_col)
+                    
+                    # Add conditional formatting to the second data range
+                    if len(all_categories) > 0:
+                        data_range_start = col_to_letter(pivot2_start_col + 1)
+                        data_range_end = col_to_letter(pivot2_start_col + len(all_categories))
+                        worksheet_breakdown.conditional_format(f'{data_range_start}{pivot2_start_row + 2}:{data_range_end}{pivot2_end_row + 1}', {
+                            'type': '3_color_scale',
+                            'min_color': "#FFC7CE",
+                            'mid_color': "#FFEB9C",
+                            'max_color': "#C6EFCE"
+                        })
+                    
+                    chart5 = workbook.add_chart({'type': 'column', 'subtype': 'stacked'})
+                    
+                    for cat_idx, category in enumerate(all_categories):
+                        col_letter = col_to_letter(pivot2_start_col + cat_idx + 1)
+                        chart5.add_series({
+                            'name': f'=\'Category-Tags Breakdown\'!${col_letter}${pivot2_start_row + 1}',
+                            'categories': f'=\'Category-Tags Breakdown\'!${pivot2_start_col_letter}${pivot2_start_row + 2}:${pivot2_start_col_letter}${pivot2_end_row + 1}',
+                            'values': f'=\'Category-Tags Breakdown\'!${col_letter}${pivot2_start_row + 2}:${col_letter}${pivot2_end_row + 1}',
+                        })
+                    
+                    chart5.set_title({'name': 'התפלגות תגים לפי קטגוריות'})
+                    chart5.set_x_axis({'name': 'תג'})
+                    chart5.set_y_axis({'name': 'כמות'})
+                    chart5.set_style(10)
+                    
+                    # Position chart to the right of the second data table (with more space)
+                    chart_col2 = col_to_letter(len(all_categories) + 2)  # Added more columns for spacing
+                    worksheet_breakdown.insert_chart(f'{chart_col2}{pivot2_start_row + 1}', chart5, {'x_scale': 1.5, 'y_scale': 1.5})
+                    
                 return full_excel_buffer.getvalue()
+
+
             st.download_button(
                     label="⤓",
                     data=download_excel,
