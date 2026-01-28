@@ -403,7 +403,7 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                     for idx, category in enumerate(all_categories, start=2):
                             worksheet_freq.write(f'A{idx}', category)
                             formula = f'=COUNTIF(\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row},"*{category}*")'
-                            count = category_counts[category]
+                            count = category_counts.get(category, 0)
                             worksheet_freq.write(f'B{idx}', formula, None, count)
                     
                     cat_end_row = len(all_categories) + 1
