@@ -7,7 +7,7 @@ import io
 
 def filter_dataframe_by_categories_and_tags(df, selected_categories, selected_tags):
     """Filter dataframe to show only rows that contain at least one of the selected categories"""
-    mask = pd.Series([True] * len(df))  # Start with all True
+    mask = pd.Series([True] * len(df), index=df.index)  # Start with all True
     if not selected_categories and not selected_tags:
         return mask
     
@@ -30,85 +30,87 @@ st.markdown("""
     img[alt="Logo"] {
         height: 3.5rem !important;
     }
- 
     </style>
 """, unsafe_allow_html=True)
 
 st.set_page_config(page_title="Mashov AI", layout="wide", page_icon=":bar_chart:", initial_sidebar_state="expanded")
-
-uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "csv"])
-df = None
-selected_sheet = None
-
-# If a file is uploaded
-if uploaded_file is None or uploaded_file.name != st.session_state.get("last_uploaded_file"):
-    st.session_state["suggested_categories"] = []
-    st.session_state["regenerate_count"] = 0
-    st.session_state["last_selected_sheet"] = None
-    st.session_state["category_filter"] = []
-    st.session_state["tags_filter"] = []
-    if "filter_mask" in st.session_state:
-        del st.session_state['filter_mask']
-    if "last_uploaded_file" in st.session_state:
-        del st.session_state["last_uploaded_file"]
-    if 'dataframe' in st.session_state:
-        del st.session_state["dataframe"]
-    if 'classified_data' in st.session_state:
-        del st.session_state['classified_data']
-        st.session_state['is_classified']=False
+try:
+    uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "csv"])
     df = None
-if st.session_state.get("dataframe") is not None:
-    df = st.session_state["dataframe"]
-if uploaded_file:
-    if uploaded_file.name.endswith('.csv'):
-        selected_sheet = "CSV file"
-        with st.spinner("Reading file...", show_time=True):
-            df = pd.read_csv(uploaded_file, encoding='utf-8', on_bad_lines='skip')
-            st.session_state["dataframe"] = df
-    else:
-        excel_data = pd.ExcelFile(uploaded_file)
-        sheet_names = excel_data.sheet_names
-        if len(sheet_names) > 1:
-            selected_sheet = st.selectbox("Choose a sheet", sheet_names, key=f"sheet_select_{uploaded_file.name}", index=None)
+    selected_sheet = None
 
-            if not selected_sheet is None:
-                with st.spinner("Reading file...", show_time=True):
-                    df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, skiprows=0)
-                    st.session_state["dataframe"] = df
-            else:
-                if 'dataframe' in st.session_state:
-                    del st.session_state["dataframe"]
-                    df = None
-
-        elif len(sheet_names) == 1:
-            df = pd.read_excel(uploaded_file, sheet_name=sheet_names[0], skiprows=0)
-            st.session_state["dataframe"] = df
-        else:
-            st.error("The uploaded file does not contain any sheets.")
-
-    if "last_uploaded_file" not in st.session_state or uploaded_file.name != st.session_state["last_uploaded_file"]:
+    # If a file is uploaded
+    if uploaded_file is None or uploaded_file.name != st.session_state.get("last_uploaded_file"):
         st.session_state["suggested_categories"] = []
         st.session_state["regenerate_count"] = 0
+        st.session_state["last_selected_sheet"] = None
         st.session_state["category_filter"] = []
         st.session_state["tags_filter"] = []
-        st.session_state["last_uploaded_file"] = uploaded_file.name
+        if "filter_mask" in st.session_state:
+            del st.session_state['filter_mask']
+        if "last_uploaded_file" in st.session_state:
+            del st.session_state["last_uploaded_file"]
+        if 'dataframe' in st.session_state:
+            del st.session_state["dataframe"]
         if 'classified_data' in st.session_state:
             del st.session_state['classified_data']
             st.session_state['is_classified']=False
-        if "filter_mask" in st.session_state:
-            del st.session_state['filter_mask']
-    
-    if uploaded_file.name.endswith('.xlsx'):  # Only for Excel
-        if "last_selected_sheet" not in st.session_state or selected_sheet != st.session_state["last_selected_sheet"]:
+        df = None
+    if st.session_state.get("dataframe") is not None:
+        df = st.session_state["dataframe"]
+    if uploaded_file:
+        if uploaded_file.name.endswith('.csv'):
+            selected_sheet = "CSV file"
+            with st.spinner("Reading file...", show_time=True):
+                df = pd.read_csv(uploaded_file, encoding='utf-8', on_bad_lines='skip')
+                st.session_state["dataframe"] = df
+        else:
+            excel_data = pd.ExcelFile(uploaded_file)
+            sheet_names = excel_data.sheet_names
+            if len(sheet_names) > 1:
+                selected_sheet = st.selectbox("Choose a sheet", sheet_names, key=f"sheet_select_{uploaded_file.name}", index=None)
+
+                if not selected_sheet is None:
+                    with st.spinner("Reading file...", show_time=True):
+                        df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, skiprows=0)
+                        st.session_state["dataframe"] = df
+                else:
+                    if 'dataframe' in st.session_state:
+                        del st.session_state["dataframe"]
+                        df = None
+
+            elif len(sheet_names) == 1:
+                df = pd.read_excel(uploaded_file, sheet_name=sheet_names[0], skiprows=0)
+                st.session_state["dataframe"] = df
+            else:
+                st.error("The uploaded file does not contain any sheets.")
+
+        if "last_uploaded_file" not in st.session_state or uploaded_file.name != st.session_state["last_uploaded_file"]:
             st.session_state["suggested_categories"] = []
             st.session_state["regenerate_count"] = 0
             st.session_state["category_filter"] = []
             st.session_state["tags_filter"] = []
-            st.session_state["last_selected_sheet"] = selected_sheet
+            st.session_state["last_uploaded_file"] = uploaded_file.name
+            if 'classified_data' in st.session_state:
+                del st.session_state['classified_data']
+                st.session_state['is_classified']=False
             if "filter_mask" in st.session_state:
                 del st.session_state['filter_mask']
-else:
-    st.info("**Important Note:** The system uses AI. Please ensure that no sensitive or private information that could compromise user privacy is uploaded.")
+        
+        if uploaded_file.name.endswith('.xlsx'):  # Only for Excel
+            if "last_selected_sheet" not in st.session_state or selected_sheet != st.session_state["last_selected_sheet"]:
+                st.session_state["suggested_categories"] = []
+                st.session_state["regenerate_count"] = 0
+                st.session_state["category_filter"] = []
+                st.session_state["tags_filter"] = []
+                st.session_state["last_selected_sheet"] = selected_sheet
+                if "filter_mask" in st.session_state:
+                    del st.session_state['filter_mask']
+    else:
+        st.info("**Important Note:** The system uses AI. Please ensure that no sensitive or private information that could compromise user privacy is uploaded.")
+except Exception as e:
+    st.error(f"Error processing file!")
+
 def generate_suggestions(df, columns_to_classify):
     with st.spinner("Generating categories..."):
         if not columns_to_classify:
@@ -200,7 +202,7 @@ with st.sidebar:
                     prompt_text = ""
                 count = 0
                 if classes and columns_to_classify and not invalid_classes and st.button("🚀 Run Classification"):    
-                    df = df.dropna(subset=columns_to_classify)
+                    df.dropna(subset=columns_to_classify, inplace=True, ignore_index=True)
                     
                     with st.spinner("Classifying...", show_time=True):
                         data_to_classify = df[columns_to_classify]
@@ -256,7 +258,7 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
 
         def apply_edit():
             if "classified_data" in st.session_state:
-                mask = st.session_state.get('filter_mask', pd.Series([True] * len(df)))
+                mask = st.session_state.get('filter_mask', pd.Series([True] * len(df), index=df.index))
                 idx_map = st.session_state["classified_data"].index[mask]
                 diff = st.session_state.get(f"editable_df", {})
                 for _idx, changes in diff.get('edited_rows',{}).items():
@@ -270,8 +272,8 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
         if category_filter or tags_filter:
             mask = filter_dataframe_by_categories_and_tags(df, st.session_state["category_filter"], st.session_state["tags_filter"])
         else:
-            mask = pd.Series([True] * len(df))
-        if ("classified_data" in st.session_state) and (st.session_state["classified_data"] is not None) and not (mask == st.session_state.get('filter_mask', pd.Series([True] * len(df)))).all():
+            mask = pd.Series([True] * len(df), index=df.index)
+        if ("classified_data" in st.session_state) and (st.session_state["classified_data"] is not None) and not (mask == st.session_state.get('filter_mask', pd.Series([True] * len(df), index=df.index))).all():
             apply_edit()
             mask = filter_dataframe_by_categories_and_tags(df, st.session_state["category_filter"], st.session_state["tags_filter"])
         st.session_state['filter_mask'] = mask
@@ -403,7 +405,7 @@ if df is not None and columns_to_classify and 'last_uploaded_file' in st.session
                     for idx, category in enumerate(all_categories, start=2):
                             worksheet_freq.write(f'A{idx}', category)
                             formula = f'=COUNTIF(\'Classified Data\'!${classification_col_letter}${data_start_row}:${classification_col_letter}${data_end_row},"*{category}*")'
-                            count = category_counts.get(category, 0)
+                            count = category_counts.get(category,0)
                             worksheet_freq.write(f'B{idx}', formula, None, count)
                     
                     cat_end_row = len(all_categories) + 1
