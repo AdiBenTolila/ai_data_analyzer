@@ -4,6 +4,27 @@ from streamlit_tags import st_tags
 import altair as alt
 from models import first_classification_ai_azure, classify_data_azure
 import io
+from streamlit_firebase_auth import FirebaseAuth
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import datetime, timezone
+import streamlit as st
+
+def _get_db():
+    if not firebase_admin._apps:
+        creds_dict = dict(st.secrets["firebase_admin"])
+        cred = credentials.Certificate(creds_dict)
+        firebase_admin.initialize_app(cred)
+
+    return firestore.client()
+
+def log_login(email: str):
+    db = _get_db()
+    db.collection("login_logs").add({
+        "email": email,
+        "timestamp": datetime.now(timezone.utc),
+        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    })
 
 def filter_dataframe_by_categories_and_tags(df, selected_categories, selected_tags):
     """Filter dataframe to show only rows that contain at least one of the selected categories"""
@@ -34,6 +55,34 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.set_page_config(page_title="Mashov AI", layout="wide", page_icon=":bar_chart:", initial_sidebar_state="expanded")
+
+auth = FirebaseAuth(
+        {
+            "apiKey": st.secrets['firebase']["apiKey"],
+            "authDomain": st.secrets['firebase']["authDomain"],
+            "projectId": st.secrets['firebase']["projectId"],
+            "storageBucket": st.secrets['firebase']["storageBucket"],
+            "messagingSenderId": st.secrets['firebase']["messagingSenderId"],
+            "appId": st.secrets['firebase']["appId"],
+        })
+
+login_user = auth.check_session()
+if not login_user:
+    res = auth.login_form()
+    if res and res['success']:
+        print(f"User {res['user']['email']} logged in successfully.")
+        log_login(res['user']['email']) 
+        st.info(f"ברוכים הבאים, {res['user']['email']}!")
+    else:
+        if res and not res['success']:
+            st.error("מייל או סיסמה שגויים בדוק שיש לך גישה למערכת.")
+        st.markdown("""
+                <p style='text-align:center; font-size:12px; color:gray; margin-top:0.5rem;'>
+                    <a href="mailto:adi_ben@jerusalem.muni.il">adi_ben@jerusalem.muni.il</a> אין לך גישה? פנה אל 
+                </p>
+            """, unsafe_allow_html=True)
+        st.stop()
+
 try:
     uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "csv"])
     df = None

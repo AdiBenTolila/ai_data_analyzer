@@ -63,3 +63,6 @@ urllib3==2.6.2
 watchdog==6.0.0
 websockets==15.0.1
 xlsxwriter==3.2.9
+langdetect
+streamlit-firebase-auth
+firebase-admin
